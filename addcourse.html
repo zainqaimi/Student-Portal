@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Course - Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <div class="container" style="max-width:500px;">
+    <h3 class="mb-3">📘 Add New Course</h3>
+
+    <input id="courseName" class="form-control mb-2" placeholder="Course Name">
+    <input id="courseCode" class="form-control mb-2" placeholder="Course Code (e.g. ENG101)">
+    <input id="duration" class="form-control mb-2" placeholder="Duration (e.g. 6 months)">
+    <input id="fee" class="form-control mb-3" placeholder="Fee (e.g. 5000)">
+    
+    <label class="form-label">Select Campuses (multi-select):</label>
+    <select id="campusSelect" class="form-select mb-3" multiple></select>
+
+    <button id="addCourseBtn" class="btn btn-primary w-100">Add Course</button>
+    <button id="backBtn" class="btn btn-secondary w-100 mt-2">⬅️ Back to Dashboard</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.appspot.com",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const campusSelect = document.getElementById("campusSelect");
+
+    // 🔹 Load campuses for selection
+    async function loadCampuses() {
+      const snap = await getDocs(collection(db, "campuses"));
+      snap.forEach(doc => {
+        const opt = document.createElement("option");
+        opt.value = doc.id;
+        opt.textContent = doc.data().name;
+        campusSelect.appendChild(opt);
+      });
+    }
+    loadCampuses();
+
+    document.getElementById("addCourseBtn").addEventListener("click", async () => {
+      const name = document.getElementById("courseName").value.trim();
+      const code = document.getElementById("courseCode").value.trim();
+      const duration = document.getElementById("duration").value.trim();
+      const fee = document.getElementById("fee").value.trim();
+      const campusIds = Array.from(campusSelect.selectedOptions).map(opt => opt.value);
+
+      if (!name || !code) return alert("Please fill all required fields!");
+
+      try {
+        await addDoc(collection(db, "courses"), {
+          name,
+          code,
+          duration,
+          fee,
+          campusIds,
+          createdAt: serverTimestamp()
+        });
+        alert("✅ Course added successfully!");
+        document.querySelectorAll("input").forEach(i => i.value = "");
+        campusSelect.selectedIndex = -1;
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    });
+
+    document.getElementById("backBtn").addEventListener("click", () => {
+      window.location.href = "admin.html";
+    });
+  </script>
+</body>
+</html>

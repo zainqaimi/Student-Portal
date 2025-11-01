@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head><title>Campus Manager Dashboard</title></head>
+<body class="p-4">
+  <h2>Welcome Campus Manager 🏫</h2>
+  <p>Aap sirf apne campus ke students manage kar sakte hain.</p>
+  <button id="logoutBtn">Logout</button>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.appspot.com",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(db, "users", user.uid);
+        const snap = await getDoc(docRef);
+        const data = snap.data();
+        if (data.role !== "campusmanager") {
+          alert("Unauthorized Access!");
+          window.location.href = "auth.html";
+        }
+      } else {
+        window.location.href = "auth.html";
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "auth.html";
+    });
+  </script>
+</body>
+</html>

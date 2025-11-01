@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Manage Courses</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>Courses</h3>
+      <div>
+        <a href="admin.html" class="btn btn-secondary">⬅️ Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Add Course -->
+    <div class="card mb-3 p-3">
+      <h5>Add New Course</h5>
+      <div class="row g-2">
+        <div class="col-md-6"><input id="courseName" class="form-control" placeholder="Course name"></div>
+        <div class="col-md-3"><input id="courseCode" class="form-control" placeholder="Code"></div>
+        <div class="col-md-3"><input id="duration" class="form-control" placeholder="Duration"></div>
+        <div class="col-md-3"><input id="fee" class="form-control" placeholder="Fee"></div>
+        <div class="col-md-9">
+          <label class="form-label">Offer in Campuses (Ctrl/Cmd + click multi-select)</label>
+          <select id="courseCampusSelect" class="form-select" multiple></select>
+        </div>
+        <div class="col-12">
+          <button id="addCourseBtn" class="btn btn-primary">Add Course</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="mb-3 d-flex gap-2 align-items-center">
+      <input id="searchCourse" class="form-control w-50" placeholder="Search by name or code">
+      <button id="refreshCourses" class="btn btn-outline-secondary">Refresh</button>
+    </div>
+
+    <!-- Courses Table -->
+    <table class="table table-bordered">
+      <thead class="table-light">
+        <tr><th>Name</th><th>Code</th><th>Duration</th><th>Fee</th><th>Campuses</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="coursesTable"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, deleteDoc
+    } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.appspot.com",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const courseCampusSelect = document.getElementById('courseCampusSelect');
+    const coursesTable = document.getElementById('coursesTable');
+
+    // load campuses into multi-select
+    async function loadCampuses() {
+      courseCampusSelect.innerHTML = '';
+      const snap = await getDocs(collection(db, 'campuses'));
+      snap.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.data().name || d.id;
+        courseCampusSelect.appendChild(opt);
+      });
+    }
+
+    async function loadCourses() {
+      coursesTable.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+      const snap = await getDocs(collection(db, 'courses'));
+      coursesTable.innerHTML = '';
+      if (snap.empty) {
+        coursesTable.innerHTML = '<tr><td colspan="6">No courses found.</td></tr>';
+        return;
+      }
+      snap.forEach(d => {
+        const c = d.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${c.name || ''}</td>
+          <td>${c.code || ''}</td>
+          <td>${c.duration || ''}</td>
+          <td>${c.fee || ''}</td>
+          <td>${(c.campusIds || []).map(id => id).join(', ')}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary editBtn" data-id="${d.id}">Edit</button>
+            <button class="btn btn-sm btn-outline-danger delBtn" data-id="${d.id}">Delete</button>
+          </td>
+        `;
+        coursesTable.appendChild(tr);
+      });
+
+      // attach events
+      document.querySelectorAll('.delBtn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this course?')) return;
+          await deleteDoc(doc(db, 'courses', btn.dataset.id));
+          alert('Deleted');
+          loadCourses();
+        });
+      });
+
+      document.querySelectorAll('.editBtn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          const docRef = doc(db, 'courses', id);
+          const docSnap = (await getDocs(query(collection(db,'courses'), where('__name__','==',id)))); // fallback
+          // simpler: fetch doc directly by id using getDocs on collection? Instead use getDocs above - we don't have getDoc import
+          // We'll use prompt UX: fetch data by reading existing row values
+          const row = btn.parentElement.parentElement;
+          const newName = prompt('Course name', row.children[0].innerText) || row.children[0].innerText;
+          const newCode = prompt('Course code', row.children[1].innerText) || row.children[1].innerText;
+          const newDuration = prompt('Duration', row.children[2].innerText) || row.children[2].innerText;
+          const newFee = prompt('Fee', row.children[3].innerText) || row.children[3].innerText;
+          // campusIds edit - for simplicity ask comma-separated ids
+          const newCampusIds = prompt('Campus IDs (comma separated)', row.children[4].innerText) || row.children[4].innerText;
+          const campusIdsArr = newCampusIds.split(',').map(s=>s.trim()).filter(Boolean);
+          await updateDoc(doc(db, 'courses', id), {
+            name: newName, code: newCode, duration: newDuration, fee: Number(newFee) || newFee, campusIds: campusIdsArr
+          });
+          alert('Updated');
+          loadCourses();
+        });
+      });
+    }
+
+    // Add course
+    document.getElementById('addCourseBtn').addEventListener('click', async () => {
+      const name = document.getElementById('courseName').value.trim();
+      const code = document.getElementById('courseCode').value.trim();
+      const duration = document.getElementById('duration').value.trim();
+      const fee = Number(document.getElementById('fee').value) || document.getElementById('fee').value;
+      const campusIds = Array.from(courseCampusSelect.selectedOptions).map(o => o.value);
+
+      if (!name || !code) return alert('Name and code required');
+      try {
+        await addDoc(collection(db, 'courses'), { name, code, duration, fee, campusIds, createdAt: new Date() });
+        alert('Course added');
+        document.getElementById('courseName').value = '';
+        document.getElementById('courseCode').value = '';
+        document.getElementById('duration').value = '';
+        document.getElementById('fee').value = '';
+        courseCampusSelect.selectedIndex = -1;
+        loadCourses();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    document.getElementById('refreshCourses').addEventListener('click', loadCourses);
+    document.getElementById('searchCourse').addEventListener('input', async (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return loadCourses();
+      const snap = await getDocs(collection(db, 'courses'));
+      coursesTable.innerHTML = '';
+      snap.forEach(d => {
+        const c = d.data();
+        if ((c.name||'').toLowerCase().includes(q) || (c.code||'').toLowerCase().includes(q)) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${c.name}</td><td>${c.code}</td><td>${c.duration||''}</td><td>${c.fee||''}</td><td>${(c.campusIds||[]).join(', ')}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-primary editBtn" data-id="${d.id}">Edit</button>
+              <button class="btn btn-sm btn-outline-danger delBtn" data-id="${d.id}">Delete</button>
+            </td>`;
+          coursesTable.appendChild(tr);
+        }
+      });
+      // re-bind events
+      document.querySelectorAll('.delBtn').forEach(btn => btn.addEventListener('click', async ()=> { if(confirm('Delete?')){ await deleteDoc(doc(db,'courses',btn.dataset.id)); loadCourses(); }}));
+      document.querySelectorAll('.editBtn').forEach(btn => btn.addEventListener('click', async ()=> {
+        const row = btn.parentElement.parentElement;
+        const newName = prompt('Course name', row.children[0].innerText) || row.children[0].innerText;
+        const newCode = prompt('Course code', row.children[1].innerText) || row.children[1].innerText;
+        const newDuration = prompt('Duration', row.children[2].innerText) || row.children[2].innerText;
+        const newFee = prompt('Fee', row.children[3].innerText) || row.children[3].innerText;
+        const newCampusIds = prompt('Campus IDs (comma separated)', row.children[4].innerText) || row.children[4].innerText;
+        await updateDoc(doc(db,'courses',btn.dataset.id), { name:newName, code:newCode, duration:newDuration, fee:Number(newFee)||newFee, campusIds:newCampusIds.split(',').map(s=>s.trim()).filter(Boolean) });
+        loadCourses();
+      } ));
+    });
+
+    // init
+    await loadCampuses();
+    loadCourses();
+  </script>
+</body>
+</html>

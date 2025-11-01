@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Manage Campuses</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <div class="container">
+    <div class="d-flex justify-content-between mb-3">
+      <h3>Campuses</h3>
+      <a href="admin.html" class="btn btn-secondary">⬅️ Dashboard</a>
+    </div>
+
+    <div class="card mb-3 p-3">
+      <h5>Add Campus</h5>
+      <div class="row g-2">
+        <div class="col-md-6"><input id="campName" class="form-control" placeholder="Campus name"></div>
+        <div class="col-md-6"><input id="campLoc" class="form-control" placeholder="Location"></div>
+        <div class="col-12">
+          <input id="campManager" class="form-control" placeholder="Manager UID (optional)">
+        </div>
+        <div class="col-12">
+          <button id="addCampusBtn" class="btn btn-primary">Add Campus</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <input id="searchCampus" class="form-control" placeholder="Search campus">
+    </div>
+
+    <table class="table table-bordered">
+      <thead class="table-light"><tr><th>Name</th><th>Location</th><th>Manager UID</th><th>Actions</th></tr></thead>
+      <tbody id="campusesTable"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.appspot.com",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const campusesTable = document.getElementById('campusesTable');
+
+    async function loadCampuses() {
+      campusesTable.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+      const snap = await getDocs(collection(db,'campuses'));
+      campusesTable.innerHTML = '';
+      if (snap.empty) { campusesTable.innerHTML = '<tr><td colspan="4">No campuses.</td></tr>'; return; }
+      snap.forEach(d => {
+        const c = d.data();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${c.name||''}</td><td>${c.location||''}</td><td>${c.managerUid||''}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary editCamp" data-id="${d.id}">Edit</button>
+            <button class="btn btn-sm btn-outline-danger delCamp" data-id="${d.id}">Delete</button>
+          </td>`;
+        campusesTable.appendChild(tr);
+      });
+      document.querySelectorAll('.delCamp').forEach(btn => btn.addEventListener('click', async ()=> {
+        if(!confirm('Delete campus?')) return;
+        await deleteDoc(doc(db,'campuses',btn.dataset.id));
+        loadCampuses();
+      }));
+      document.querySelectorAll('.editCamp').forEach(btn => btn.addEventListener('click', async ()=> {
+        const id = btn.dataset.id;
+        const row = btn.parentElement.parentElement;
+        const newName = prompt('Campus name', row.children[0].innerText) || row.children[0].innerText;
+        const newLoc = prompt('Location', row.children[1].innerText) || row.children[1].innerText;
+        const newManager = prompt('Manager UID', row.children[2].innerText) || row.children[2].innerText;
+        await updateDoc(doc(db,'campuses',id), { name:newName, location:newLoc, managerUid:newManager });
+        loadCampuses();
+      }));
+    }
+
+    document.getElementById('addCampusBtn').addEventListener('click', async ()=> {
+      const name = document.getElementById('campName').value.trim();
+      const location = document.getElementById('campLoc').value.trim();
+      const managerUid = document.getElementById('campManager').value.trim();
+      if(!name || !location) return alert('Name & location required');
+      await addDoc(collection(db,'campuses'), { name, location, managerUid, createdAt: new Date() });
+      document.getElementById('campName').value=''; document.getElementById('campLoc').value=''; document.getElementById('campManager').value='';
+      loadCampuses();
+    });
+
+    document.getElementById('searchCampus').addEventListener('input', async (e)=> {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return loadCampuses();
+      const snap = await getDocs(collection(db,'campuses'));
+      campusesTable.innerHTML = '';
+      snap.forEach(d => {
+        const c = d.data();
+        if ((c.name||'').toLowerCase().includes(q) || (c.location||'').toLowerCase().includes(q)) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${c.name}</td><td>${c.location}</td><td>${c.managerUid||''}</td>
+            <td><button class="btn btn-sm btn-outline-primary editCamp" data-id="${d.id}">Edit</button>
+            <button class="btn btn-sm btn-outline-danger delCamp" data-id="${d.id}">Delete</button></td>`;
+          campusesTable.appendChild(tr);
+        }
+      });
+      // rebind
+      document.querySelectorAll('.delCamp').forEach(btn => btn.addEventListener('click', async ()=> { if(confirm('Delete?')){ await deleteDoc(doc(db,'campuses',btn.dataset.id)); loadCampuses(); } }));
+      document.querySelectorAll('.editCamp').forEach(btn => btn.addEventListener('click', async ()=> {
+        const row = btn.parentElement.parentElement; const newName = prompt('Campus name', row.children[0].innerText) || row.children[0].innerText;
+        const newLoc = prompt('Location', row.children[1].innerText) || row.children[1].innerText;
+        const newManager = prompt('Manager UID', row.children[2].innerText) || row.children[2].innerText;
+        await updateDoc(doc(db,'campuses',btn.dataset.id), { name:newName, location:newLoc, managerUid:newManager });
+        loadCampuses();
+      }));
+    });
+
+    // init
+    loadCampuses();
+  </script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Students - Manage</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>Students</h3>
+      <div>
+        <a href="admin.html" class="btn btn-secondary">⬅️ Dashboard</a>
+        <a href="addstudent.html" class="btn btn-primary ms-2">➕ Add Student</a>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row g-2 mb-3">
+      <div class="col-md-3">
+        <select id="filterCampus" class="form-select"><option value="">All Campuses</option></select>
+      </div>
+      <div class="col-md-3">
+        <select id="filterCourse" class="form-select"><option value="">All Courses</option></select>
+      </div>
+      <div class="col-md-3">
+        <select id="filterStatus" class="form-select">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <div class="col-md-3"><input id="searchStudents" class="form-control" placeholder="Search name or id"></div>
+    </div>
+
+    <table class="table table-bordered">
+      <thead class="table-light">
+        <tr><th>Photo</th><th>StudentID</th><th>Name</th><th>Campus</th><th>Courses</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="studentsTable"></tbody>
+    </table>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+    import { getStorage, ref, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.appspot.com",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    const studentsTable = document.getElementById('studentsTable');
+    const filterCampus = document.getElementById('filterCampus');
+    const filterCourse = document.getElementById('filterCourse');
+    const filterStatus = document.getElementById('filterStatus');
+    const searchStudents = document.getElementById('searchStudents');
+
+    // load campus & course options
+    async function loadFilters() {
+      filterCampus.innerHTML = '<option value="">All Campuses</option>';
+      filterCourse.innerHTML = '<option value="">All Courses</option>';
+      const campSnap = await getDocs(collection(db,'campuses'));
+      campSnap.forEach(d => filterCampus.innerHTML += `<option value="${d.id}">${d.data().name||d.id}</option>`);
+      const courseSnap = await getDocs(collection(db,'courses'));
+      courseSnap.forEach(d => filterCourse.innerHTML += `<option value="${d.id}">${d.data().name||d.id}</option>`);
+    }
+
+    async function loadStudents() {
+      studentsTable.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
+      // simple fetch all then filter in JS (fine for moderate dataset)
+      const snap = await getDocs(collection(db,'students'));
+      studentsTable.innerHTML = '';
+      if (snap.empty) { studentsTable.innerHTML = '<tr><td colspan="7">No students</td></tr>'; return; }
+      const searchQ = searchStudents.value.trim().toLowerCase();
+      snap.forEach(d => {
+        const s = d.data();
+        // basic filters
+        if (filterCampus.value && s.campusId !== filterCampus.value) return;
+        if (filterStatus.value && s.status !== filterStatus.value) return;
+        if (filterCourse.value) {
+          const hasCourse = (s.courses || []).some(c => c.courseId === filterCourse.value);
+          if (!hasCourse) return;
+        }
+        if (searchQ) {
+          const fullname = (s.name||'').toLowerCase();
+          const sid = (s.studentId||'').toLowerCase();
+          if (!fullname.includes(searchQ) && !sid.includes(searchQ)) return;
+        }
+
+        const tr = document.createElement('tr');
+        const photo = s.photoUrl ? `<img src="${s.photoUrl}" style="width:50px;height:50px;border-radius:4px">` : '';
+        const coursesText = (s.courses || []).map(c=>c.courseId).join(', ');
+        tr.innerHTML = `<td>${photo}</td>
+          <td>${s.studentId||''}</td>
+          <td>${s.name||''}</td>
+          <td>${s.campusId||''}</td>
+          <td>${coursesText}</td>
+          <td><span class="badge ${s.status==='approved'||s.status==='active'?'bg-success':'bg-warning text-dark'}">${s.status||''}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary editStu" data-id="${d.id}">Edit</button>
+            <button class="btn btn-sm btn-outline-danger delStu" data-id="${d.id}">Delete</button>
+          </td>`;
+        studentsTable.appendChild(tr);
+      });
+
+      // bind actions
+      document.querySelectorAll('.delStu').forEach(btn => btn.addEventListener('click', async ()=> {
+        if(!confirm('Delete student?')) return;
+        await deleteDoc(doc(db,'students',btn.dataset.id));
+        loadStudents();
+      }));
+      document.querySelectorAll('.editStu').forEach(btn => btn.addEventListener('click', async ()=> {
+        // simple edit via prompts: you can replace with modal later
+        const id = btn.dataset.id;
+        const row = btn.parentElement.parentElement;
+        const newName = prompt('Name', row.children[2].innerText) || row.children[2].innerText;
+        const newBatch = prompt('Batch', (await getDocs(query(collection(db,'students'), where('__name__','==',id)))).docs[0].data().batch || '') || '';
+        // for simplicity update name & batch & status
+        const newStatus = prompt('Status (active/inactive/pending/approved)', row.children[5].innerText) || row.children[5].innerText;
+        await updateDoc(doc(db,'students',id), { name:newName, batch:newBatch, status:newStatus, updatedAt:new Date() });
+        loadStudents();
+      }));
+    }
+
+    // event listeners
+    filterCampus.addEventListener('change', loadStudents);
+    filterCourse.addEventListener('change', loadStudents);
+    filterStatus.addEventListener('change', loadStudents);
+    searchStudents.addEventListener('input', () => loadStudents());
+
+    // init
+    await loadFilters();
+    loadStudents();
+  </script>
+</body>
+</html>

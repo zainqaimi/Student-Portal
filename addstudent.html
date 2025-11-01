@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Student - Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <div class="container" style="max-width:500px;">
+    <h3 class="mb-3">Add New Student</h3>
+
+    <input id="stuName" class="form-control mb-2" placeholder="Student Name">
+    <input id="stuFather" class="form-control mb-2" placeholder="Father Name">
+    <input id="stuEmail" class="form-control mb-2" placeholder="Email">
+    <input id="stuPhone" class="form-control mb-2" placeholder="Phone">
+    <input id="stuBatch" class="form-control mb-2" placeholder="Batch (e.g. 2025)">
+    <textarea id="stuAddress" class="form-control mb-2" placeholder="Address"></textarea>
+
+    <label class="form-label">Campus:</label>
+    <select id="campusSelect" class="form-select mb-2">
+      <option value="">Select Campus</option>
+    </select>
+
+    <label class="form-label">Courses:</label>
+    <select id="courseSelect" class="form-select mb-3" multiple>
+      <!-- Courses will load dynamically -->
+    </select>
+
+    <label class="form-label">Student Photo:</label>
+    <input type="file" id="photoInput" class="form-control mb-3" accept="image/*">
+
+    <select id="stuStatus" class="form-select mb-3">
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+
+    <button id="addStudentBtn" class="btn btn-primary w-100">Add Student</button>
+    <button id="backBtn" class="btn btn-secondary w-100 mt-2">⬅️ Back to Dashboard</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.appspot.com",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    const campusSelect = document.getElementById("campusSelect");
+    const courseSelect = document.getElementById("courseSelect");
+
+    // 🔹 Fetch campuses
+    async function loadCampuses() {
+      const snap = await getDocs(collection(db, "campuses"));
+      snap.forEach(doc => {
+        const opt = document.createElement("option");
+        opt.value = doc.id;
+        opt.textContent = doc.data().name;
+        campusSelect.appendChild(opt);
+      });
+    }
+
+    // 🔹 Fetch courses
+    async function loadCourses() {
+      const snap = await getDocs(collection(db, "courses"));
+      snap.forEach(doc => {
+        const opt = document.createElement("option");
+        opt.value = doc.id;
+        opt.textContent = doc.data().name;
+        courseSelect.appendChild(opt);
+      });
+    }
+
+    loadCampuses();
+    loadCourses();
+
+    // 🔹 Add Student
+    document.getElementById("addStudentBtn").addEventListener("click", async () => {
+      const name = document.getElementById("stuName").value.trim();
+      const fatherName = document.getElementById("stuFather").value.trim();
+      const email = document.getElementById("stuEmail").value.trim();
+      const phone = document.getElementById("stuPhone").value.trim();
+      const batch = document.getElementById("stuBatch").value.trim();
+      const address = document.getElementById("stuAddress").value.trim();
+      const status = document.getElementById("stuStatus").value;
+      const campusId = campusSelect.value;
+
+      const selectedCourses = Array.from(courseSelect.selectedOptions).map(opt => ({
+        courseId: opt.value,
+        enrolledAt: new Date().toISOString(),
+        status: "enrolled"
+      }));
+
+      const photoFile = document.getElementById("photoInput").files[0];
+      let photoUrl = "";
+
+      if (photoFile) {
+        const storageRef = ref(storage, "student_photos/" + Date.now() + "_" + photoFile.name);
+        await uploadBytes(storageRef, photoFile);
+        photoUrl = await getDownloadURL(storageRef);
+      }
+
+      if (!name || !email || !campusId) return alert("Please fill all required fields!");
+
+      try {
+        await addDoc(collection(db, "students"), {
+          studentId: "STU" + Date.now(),
+          name,
+          fatherName,
+          email,
+          phone,
+          batch,
+          address,
+          campusId,
+          courses: selectedCourses,
+          photoUrl,
+          status,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
+        alert("🎉 Student added successfully!");
+        document.querySelectorAll("input, textarea").forEach(i => i.value = "");
+        campusSelect.selectedIndex = 0;
+        courseSelect.selectedIndex = -1;
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    });
+
+    document.getElementById("backBtn").addEventListener("click", () => {
+      window.location.href = "admin.html";
+    });
+  </script>
+</body>
+</html>

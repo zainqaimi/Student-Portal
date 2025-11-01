@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Student Portal - Firebase Setup</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <h2>Firebase Setup Test</h2>
+  <button id="testBtn" class="btn btn-success">Test Firebase</button>
+
+  <script type="module">
+    // ✅ Step 1: Import Firebase modules from CDN
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getAuth } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+
+    // ✅ Step 2: Your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+      authDomain: "studentportal-27f0e.firebaseapp.com",
+      projectId: "studentportal-27f0e",
+      storageBucket: "studentportal-27f0e.firebasestorage.app",
+      messagingSenderId: "720954283815",
+      appId: "1:720954283815:web:0c51933a3f8631f58dfb02",
+      measurementId: "G-M8RSN0J8SX"
+    };
+
+    // ✅ Step 3: Initialize Firebase app + services
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ✅ Step 4: Test button to verify setup
+    document.getElementById("testBtn").addEventListener("click", () => {
+      console.log("Firebase initialized successfully ✅");
+      console.log("App:", app.name);
+      alert("Firebase setup working fine!");
+    });
+  </script>
+</body>
+</html>
