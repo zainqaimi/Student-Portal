@@ -38,109 +38,130 @@
     <button id="backBtn" class="btn btn-secondary w-100 mt-2">⬅️ Back to Dashboard</button>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+import { getFirestore, collection, getDocs, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-storage.js";
+import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
-      authDomain: "studentportal-27f0e.firebaseapp.com",
-      projectId: "studentportal-27f0e",
-      storageBucket: "studentportal-27f0e.appspot.com",
-      messagingSenderId: "720954283815",
-      appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
-    };
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyCAAlLARl0EFxQy2Z3SW8eX9uXGLNYkRWY",
+  authDomain: "studentportal-27f0e.firebaseapp.com",
+  projectId: "studentportal-27f0e",
+  storageBucket: "studentportal-27f0e.appspot.com",
+  messagingSenderId: "720954283815",
+  appId: "1:720954283815:web:0c51933a3f8631f58dfb02"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
 
-    const campusSelect = document.getElementById("campusSelect");
-    const courseSelect = document.getElementById("courseSelect");
+const campusSelect = document.getElementById("campusSelect");
+const courseSelect = document.getElementById("courseSelect");
 
-    // 🔹 Fetch campuses
-    async function loadCampuses() {
-      const snap = await getDocs(collection(db, "campuses"));
-      snap.forEach(doc => {
-        const opt = document.createElement("option");
-        opt.value = doc.id;
-        opt.textContent = doc.data().name;
-        campusSelect.appendChild(opt);
-      });
-    }
+// 🔹 Fetch campuses
+async function loadCampuses() {
+  const snap = await getDocs(collection(db, "campuses"));
+  snap.forEach(doc => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.data().name;
+    campusSelect.appendChild(opt);
+  });
+}
 
-    // 🔹 Fetch courses
-    async function loadCourses() {
-      const snap = await getDocs(collection(db, "courses"));
-      snap.forEach(doc => {
-        const opt = document.createElement("option");
-        opt.value = doc.id;
-        opt.textContent = doc.data().name;
-        courseSelect.appendChild(opt);
-      });
-    }
+// 🔹 Fetch courses
+async function loadCourses() {
+  const snap = await getDocs(collection(db, "courses"));
+  snap.forEach(doc => {
+    const opt = document.createElement("option");
+    opt.value = doc.id;
+    opt.textContent = doc.data().name;
+    courseSelect.appendChild(opt);
+  });
+}
 
-    loadCampuses();
-    loadCourses();
+loadCampuses();
+loadCourses();
 
-    // 🔹 Add Student
-    document.getElementById("addStudentBtn").addEventListener("click", async () => {
-      const name = document.getElementById("stuName").value.trim();
-      const fatherName = document.getElementById("stuFather").value.trim();
-      const email = document.getElementById("stuEmail").value.trim();
-      const phone = document.getElementById("stuPhone").value.trim();
-      const batch = document.getElementById("stuBatch").value.trim();
-      const address = document.getElementById("stuAddress").value.trim();
-      const status = document.getElementById("stuStatus").value;
-      const campusId = campusSelect.value;
+// 🔹 Add Student
+document.getElementById("addStudentBtn").addEventListener("click", async () => {
+  const name = document.getElementById("stuName").value.trim();
+  const fatherName = document.getElementById("stuFather").value.trim();
+  const email = document.getElementById("stuEmail").value.trim().toLowerCase();
+  const phone = document.getElementById("stuPhone").value.trim();
+  const batch = document.getElementById("stuBatch").value.trim();
+  const address = document.getElementById("stuAddress").value.trim();
+  const status = document.getElementById("stuStatus").value;
+  const campusId = campusSelect.value;
 
-      const selectedCourses = Array.from(courseSelect.selectedOptions).map(opt => ({
-        courseId: opt.value,
-        enrolledAt: new Date().toISOString(),
-        status: "enrolled"
-      }));
+  const selectedCourses = Array.from(courseSelect.selectedOptions).map(opt => ({
+    courseId: opt.value,
+    enrolledAt: new Date().toISOString(),
+    status: "enrolled"
+  }));
 
-      const photoFile = document.getElementById("photoInput").files[0];
-      let photoUrl = "";
+  const photoFile = document.getElementById("photoInput").files[0];
+  let photoUrl = "";
 
-      if (photoFile) {
-        const storageRef = ref(storage, "student_photos/" + Date.now() + "_" + photoFile.name);
-        await uploadBytes(storageRef, photoFile);
-        photoUrl = await getDownloadURL(storageRef);
-      }
+  if (photoFile) {
+    const storageRef = ref(storage, "student_photos/" + Date.now() + "_" + photoFile.name);
+    await uploadBytes(storageRef, photoFile);
+    photoUrl = await getDownloadURL(storageRef);
+  }
 
-      if (!name || !email || !campusId) return alert("Please fill all required fields!");
+  if (!name || !email || !campusId) return alert("Please fill all required fields!");
 
-      try {
-        await addDoc(collection(db, "students"), {
-          studentId: "STU" + Date.now(),
-          name,
-          fatherName,
-          email,
-          phone,
-          batch,
-          address,
-          campusId,
-          courses: selectedCourses,
-          photoUrl,
-          status,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
+  try {
+    // 1️⃣ Create Auth user first
+    const password = "Student@123"; // Default password, admin can change
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    const uid = userCred.user.uid;
 
-        alert("🎉 Student added successfully!");
-        document.querySelectorAll("input, textarea").forEach(i => i.value = "");
-        campusSelect.selectedIndex = 0;
-        courseSelect.selectedIndex = -1;
-      } catch (err) {
-        alert("Error: " + err.message);
-      }
+    // 2️⃣ Save student document with UID as ID
+    await setDoc(doc(db, "students", uid), {
+      uid,
+      studentId: "STU" + Date.now(),
+      name,
+      fatherName,
+      email,
+      phone,
+      batch,
+      address,
+      campusId,
+      courses: selectedCourses,
+      photoUrl,
+      status,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
 
-    document.getElementById("backBtn").addEventListener("click", () => {
-      window.location.href = "admin.html";
+    // 3️⃣ Also save in 'users' collection
+    await setDoc(doc(db, "users", uid), {
+      uid,
+      name,
+      email,
+      role: "student",
+      campusId,
+      createdAt: serverTimestamp()
     });
-  </script>
+
+    alert("🎉 Student added successfully! Default password: Student@123");
+    document.querySelectorAll("input, textarea").forEach(i => i.value = "");
+    campusSelect.selectedIndex = 0;
+    courseSelect.selectedIndex = -1;
+
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+});
+
+document.getElementById("backBtn").addEventListener("click", () => {
+  window.location.href = "admin.html";
+});
+</script>
 </body>
 </html>
